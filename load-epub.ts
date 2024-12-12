@@ -4,24 +4,21 @@
  * All rights reserved.
  */
 
-import type { LoadData } from "../types";
-import extractEpub from "./extract-epub";
-import generateEpubHtml from "./generate-epub-html";
-import generateEpubStyleSheet from "./generate-epub-style-sheet";
-import getEpubCoverImageFilename from "./get-epub-cover-image-filename";
-import { isOPFType } from "./types";
-import reduceObjToBlobs from "../utils/reduce-obj-to-blobs";
+import extractEpub from "./extract-epub.ts";
+import generateEpubHtml from "./generate-epub-html.ts";
+import generateEpubStyleSheet from "./generate-epub-style-sheet.ts";
+import { isOPFType, type LoadData } from "./types.ts";
+import reduceObjToBlobs from "./reduce-obj-to-blobs.ts";
+import * as path from "@std/path";
 
-export default async function loadEpub(
-  file: File,
-  document: Document,
-  lastBookModified: number,
-): Promise<LoadData> {
-  const { contents, result: data } = await extractEpub(file);
-  const result = generateEpubHtml(data, contents, document);
+export default async function loadEpub(filePath: string): Promise<LoadData> {
+  const stream = await Deno.readFile(filePath);
+  const blob = new Blob([stream]);
+  const { contents, result: data } = await extractEpub(blob);
+  const result = generateEpubHtml(data, contents);
 
   const displayData = {
-    title: file.name,
+    title: path.parse(filePath).name,
     hasThumb: true,
     styleSheet: generateEpubStyleSheet(data, contents),
   };
@@ -39,24 +36,12 @@ export default async function loadEpub(
     }
   }
   const blobData = reduceObjToBlobs(data);
-  const coverImageFilename = await getEpubCoverImageFilename(
-    blobData,
-    contents,
-  );
-  let coverImage: Blob | undefined;
-
-  if (coverImageFilename) {
-    coverImage = blobData[coverImageFilename];
-  }
 
   return {
     ...displayData,
     elementHtml: result.element.innerHTML,
     blobs: blobData,
-    coverImage,
     characters: result.characters,
     sections: result.sections,
-    lastBookModified,
-    lastBookOpen: 0,
   };
 }

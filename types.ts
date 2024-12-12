@@ -4,8 +4,7 @@
  * All rights reserved.
  */
 
-interface BooksDbBookData {
-  id: number;
+export interface LoadData {
   title: string;
   styleSheet: string;
   elementHtml: string;
@@ -14,23 +13,17 @@ interface BooksDbBookData {
   hasThumb: boolean;
   characters: number;
   sections?: Section[];
-  lastBookModified: number;
-  lastBookOpen: number;
   storageSource?: string;
   htmlBackup?: string;
 }
 
-interface Section {
+export interface Section {
   reference: string;
   charactersWeight: number;
   label?: string;
   startCharacter?: number;
   characters?: number;
   parentChapter?: string;
-}
-
-export interface LoadData extends Omit<BooksDbBookData, "id"> {
-  coverImage: Blob | undefined;
 }
 
 export interface EpubMetadataMeta {

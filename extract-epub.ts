@@ -4,15 +4,12 @@
  * All rights reserved.
  */
 
-import { BlobReader, BlobWriter, TextWriter, ZipReader } from '@zip.js/zip.js';
-import { isOPFType, type EpubContent, type EpubOPFContent } from './types';
+import { BlobReader, BlobWriter, TextWriter, ZipReader } from "@zip.js/zip.js";
+import { isOPFType, type EpubContent, type EpubOPFContent } from "./types.ts";
 
-import type { Entry } from '@zip.js/zip.js';
-import { XMLParser } from 'fast-xml-parser';
-import initZipSettings from '../utils/init-zip-settings';
-import path from 'path-browserify';
-
-initZipSettings();
+import type { Entry } from "@zip.js/zip.js";
+import { XMLParser } from "fast-xml-parser";
+import * as path from "@std/path";
 
 export default async function extractEpub(blob: Blob) {
   const reader = new ZipReader(new BlobReader(blob));
@@ -20,7 +17,7 @@ export default async function extractEpub(blob: Blob) {
   const entries = await reader.getEntries();
 
   const result: Record<string, string | Blob> = {};
-  let contentsDirectory = '';
+  let contentsDirectory = "";
   let contents!: EpubContent | EpubOPFContent;
   if (entries.length) {
     const fileMap = entries.reduce<Record<string, Entry>>((acc, cur) => {
@@ -28,17 +25,21 @@ export default async function extractEpub(blob: Blob) {
       return acc;
     }, {});
 
-    const containerXml = await fileMap['META-INF/container.xml'].getData!(new TextWriter());
+    const containerXml = await fileMap["META-INF/container.xml"].getData!(
+      new TextWriter(),
+    );
     const parser = new XMLParser({
-      ignoreAttributes: false
+      ignoreAttributes: false,
     });
     const container = parser.parse(containerXml);
     const rootFiles = container.container.rootfiles.rootfile;
     const rootFile = Array.isArray(rootFiles) ? rootFiles[0] : rootFiles;
 
-    const contentOpfFilename = rootFile['@_full-path'];
+    const contentOpfFilename = rootFile["@_full-path"];
 
-    const contentsXml = await fileMap[contentOpfFilename].getData!(new TextWriter());
+    const contentsXml = await fileMap[contentOpfFilename].getData!(
+      new TextWriter(),
+    );
     result[contentOpfFilename] = contentsXml;
 
     contentsDirectory = path.dirname(contentOpfFilename);
@@ -47,22 +48,22 @@ export default async function extractEpub(blob: Blob) {
 
     await Promise.all(
       (isOPFType(contents)
-        ? contents['opf:package']['opf:manifest']['opf:item']
+        ? contents["opf:package"]["opf:manifest"]["opf:item"]
         : contents.package.manifest.item
       ).map(async (item) => {
-        const fileRelativePath = item['@_href'];
+        const fileRelativePath = item["@_href"];
         const entry = fileMap[path.join(contentsDirectory, fileRelativePath)];
         if (entry.getData && !entry.directory) {
           let value: string | Blob;
-          const mediaType: string = item['@_media-type'];
-          if (mediaType.startsWith('image/')) {
+          const mediaType: string = item["@_media-type"];
+          if (mediaType.startsWith("image/")) {
             value = await entry.getData(new BlobWriter(mediaType));
           } else {
             value = await entry.getData(new TextWriter());
           }
           result[fileRelativePath] = value;
         }
-      })
+      }),
     );
   }
 
@@ -70,6 +71,6 @@ export default async function extractEpub(blob: Blob) {
   return {
     contentsDirectory,
     contents,
-    result
+    result,
   };
 }

@@ -4,7 +4,7 @@
  * All rights reserved.
  */
 
-import { isNodeGaiji } from './is-node-gaiji';
+import { isNodeGaiji } from "./is-node-gaiji.ts";
 
 export function getCharacterCount(node: Node) {
   return isNodeGaiji(node) ? 1 : getRawCharacterCount(node);
@@ -15,7 +15,9 @@ const isNotJapaneseRegex =
 
 function getRawCharacterCount(node: Node) {
   if (!node.textContent) return 0;
-  return countUnicodeCharacters(node.textContent.replace(isNotJapaneseRegex, ''));
+  return countUnicodeCharacters(
+    node.textContent.replace(isNotJapaneseRegex, ""),
+  );
 }
 
 /**

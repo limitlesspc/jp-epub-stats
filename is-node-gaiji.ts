@@ -4,10 +4,11 @@
  * All rights reserved.
  */
 
-import { isElementGaiji } from './is-element-gaiji';
+import { window } from "./dom.ts";
+import { isElementGaiji } from "./is-element-gaiji.ts";
 
 export function isNodeGaiji(node: Node) {
-  if (!(node instanceof HTMLImageElement)) {
+  if (!(node instanceof window.HTMLImageElement)) {
     return false;
   }
   return isElementGaiji(node);
