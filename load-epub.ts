@@ -6,9 +6,7 @@
 
 import extractEpub from "./extract-epub.ts";
 import generateEpubHtml from "./generate-epub-html.ts";
-import generateEpubStyleSheet from "./generate-epub-style-sheet.ts";
 import { isOPFType, type LoadData } from "./types.ts";
-import reduceObjToBlobs from "./reduce-obj-to-blobs.ts";
 import * as path from "@std/path";
 
 export default async function loadEpub(filePath: string): Promise<LoadData> {
@@ -17,11 +15,7 @@ export default async function loadEpub(filePath: string): Promise<LoadData> {
   const { contents, result: data } = await extractEpub(blob);
   const result = generateEpubHtml(data, contents);
 
-  const displayData = {
-    title: path.parse(filePath).name,
-    hasThumb: true,
-    styleSheet: generateEpubStyleSheet(data, contents),
-  };
+  let title = path.parse(filePath).name;
 
   const metadata = isOPFType(contents)
     ? contents["opf:package"]["opf:metadata"]
@@ -30,17 +24,14 @@ export default async function loadEpub(filePath: string): Promise<LoadData> {
   if (metadata) {
     const dcTitle = metadata["dc:title"];
     if (typeof dcTitle === "string") {
-      displayData.title = dcTitle;
+      title = dcTitle;
     } else if (dcTitle && dcTitle["#text"]) {
-      displayData.title = dcTitle["#text"];
+      title = dcTitle["#text"];
     }
   }
-  const blobData = reduceObjToBlobs(data);
 
   return {
-    ...displayData,
-    elementHtml: result.element.innerHTML,
-    blobs: blobData,
+    title,
     characters: result.characters,
     sections: result.sections,
   };

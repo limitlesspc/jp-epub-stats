@@ -4,19 +4,15 @@
  * All rights reserved.
  */
 
-import { document, window } from "./dom.ts";
+import { window } from "./dom.ts";
 import {
   isOPFType,
   type EpubContent,
   type EpubOPFContent,
   type Section,
 } from "./types.ts";
-import buildDummyBookImage from "./build-dummy-book-image.ts";
-import clearAllBadImageRef from "./clear-all-bad-image-ref.ts";
-import fixXHtmlHref from "./fix-xhtml-href.ts";
 import { getCharacterCount } from "./get-character-count.ts";
 import { getParagraphNodes } from "./get-paragraph-nodes.ts";
-import * as path from "@std/path";
 
 export const prependValue = "ttu-";
 
@@ -26,8 +22,7 @@ export default function generateEpubHtml(
 ) {
   const fallbackData = new Map<string, string>();
 
-  let tocData = { type: 3, content: "" };
-  let navKey = "";
+  const tocData = { type: 3, content: "" };
 
   const itemIdToHtmlRef = (
     isOPFType(contents)
@@ -43,32 +38,9 @@ export default function generateEpubHtml(
       item["@_media-type"] === "text/html"
     ) {
       acc[item["@_id"]] = item["@_href"];
-
-      if (item["@_properties"] === "nav") {
-        navKey = item["@_href"];
-      }
     }
     return acc;
   }, {});
-
-  const blobLocations = Object.entries(data).reduce<string[]>(
-    (acc, [key, value]) => {
-      const isV2Toc = key.endsWith(".ncx") && !tocData.content;
-
-      if (isV2Toc || navKey === key) {
-        tocData = {
-          type: isV2Toc ? 2 : 3,
-          content: value as string,
-        };
-      }
-
-      if (value instanceof Blob) {
-        acc.push(key);
-      }
-      return acc;
-    },
-    [],
-  );
 
   const parser = new window.DOMParser();
   const spineItemRef = isOPFType(contents)
@@ -76,7 +48,6 @@ export default function generateEpubHtml(
     : contents.package.spine.itemref;
   const itemRefs = Array.isArray(spineItemRef) ? spineItemRef : [spineItemRef];
   const sectionData: Section[] = [];
-  const result = document.createElement("div");
 
   let mainChapters: Section[] = [];
   let firstChapterMatchIndex = -1;
@@ -172,43 +143,15 @@ export default function generateEpubHtml(
         data[htmlHref] as string,
         "text/xml",
       );
-      body = parsedContent.querySelector("body"); // XMLDocument doesn't seem to have the body property
+      const potentialBody = parsedContent.querySelector("body"); // XMLDocument doesn't seem to have the body property
 
-      if (!body?.childNodes?.length) {
+      if (!potentialBody?.childNodes?.length) {
         throw new Error("Unable to find valid body content while parsing EPUB");
       }
+      body = potentialBody;
     }
 
-    const htmlClass = parsedContent.querySelector("html")?.className || "";
-    const bodyId = body.id || "";
-    const bodyClass = body.className || "";
-    let innerHtml = body.innerHTML || "";
-
-    blobLocations.forEach((blobLocation) => {
-      innerHtml = innerHtml.replaceAll(
-        relative(htmlHref, blobLocation),
-        buildDummyBookImage(blobLocation),
-      );
-    });
-
-    const childBodyDiv = document.createElement("div");
-    childBodyDiv.className = `ttu-book-body-wrapper ${bodyClass}`;
-    if (bodyId) {
-      childBodyDiv.id = bodyId;
-    }
-    childBodyDiv.innerHTML = innerHtml;
-
-    const childHtmlDiv = document.createElement("div");
-    childHtmlDiv.className = `ttu-book-html-wrapper ${htmlClass}`;
-    childHtmlDiv.appendChild(childBodyDiv);
-
-    const childWrapperDiv = document.createElement("div");
-    childWrapperDiv.id = `${prependValue}${itemIdRef}`;
-    childWrapperDiv.appendChild(childHtmlDiv);
-
-    result.appendChild(childWrapperDiv);
-
-    currentCharCount += countForElement(childWrapperDiv);
+    currentCharCount += countForElement(body);
 
     const mainChapterIndex = mainChapters.findIndex((chapter) =>
       chapter.reference.includes(htmlHref.split("/").pop() || ""),
@@ -247,12 +190,7 @@ export default function generateEpubHtml(
     previousCharacterCount = currentCharCount;
   });
 
-  clearAllBadImageRef(result);
-  fixXHtmlHref(result);
-  flattenAnchorHref(result);
-
   return {
-    element: result,
     characters: currentCharCount,
     sections: sectionData.filter((item: Section) =>
       item.reference.startsWith(prependValue),
@@ -270,52 +208,4 @@ function countForElement(containerEl: Node) {
   });
 
   return characterCount;
-}
-
-function flattenAnchorHref(el: HTMLElement) {
-  Array.from(el.getElementsByTagName("a")).forEach((tag) => {
-    const oldHref = tag.getAttribute("href");
-    if (!oldHref) return;
-    tag.setAttribute("href", `#${oldHref.replace(/.+#/, "")}`);
-  });
-}
-
-/**
- * Replicates https://nodejs.org/api/path.html#path_path_relative_from_to
- */
-function relative(fromPath: string, toPath: string): string {
-  const fromDirName = path.dirname(fromPath);
-  const toDirName = path.dirname(toPath);
-  const toFilename = path.basename(toPath);
-
-  if (fromDirName === toDirName) {
-    return toFilename;
-  }
-
-  const fromParts = fromDirName === "." ? [] : fromDirName.split("/");
-  const toParts = toDirName === "." ? [] : toDirName.split("/");
-
-  if (fromParts.length >= toParts.length) {
-    for (let i = 0; i < fromParts.length; i += 1) {
-      if (fromParts[i] !== toParts[i]) {
-        return path.join(
-          "../".repeat(fromParts.length - i) + toParts.slice(i).join("/"),
-          toFilename,
-        );
-      }
-    }
-  }
-  for (let i = 0; i < fromParts.length; i += 1) {
-    if (fromParts[i] !== toParts[i]) {
-      return path.join(
-        "../".repeat(fromParts.length - i) + toParts.slice(i).join("/"),
-        toFilename,
-      );
-    }
-  }
-
-  return path.join(
-    toParts.slice(fromParts.length - toParts.length).join("/"),
-    toFilename,
-  );
 }

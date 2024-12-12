@@ -6,15 +6,8 @@
 
 export interface LoadData {
   title: string;
-  styleSheet: string;
-  elementHtml: string;
-  blobs: Record<string, Blob>;
-  coverImage?: string | Blob;
-  hasThumb: boolean;
   characters: number;
-  sections?: Section[];
-  storageSource?: string;
-  htmlBackup?: string;
+  sections: Section[];
 }
 
 export interface Section {
