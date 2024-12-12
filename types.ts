@@ -4,12 +4,6 @@
  * All rights reserved.
  */
 
-export interface LoadData {
-  title: string;
-  characters: number;
-  sections: Section[];
-}
-
 export interface Section {
   reference: string;
   charactersWeight: number;
