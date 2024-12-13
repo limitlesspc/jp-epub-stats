@@ -32,8 +32,7 @@ export default async function loadEpub(filePath: string) {
   }
 
   return {
+    ...result,
     title,
-    characters: result.characters,
-    sections: result.sections,
   };
 }

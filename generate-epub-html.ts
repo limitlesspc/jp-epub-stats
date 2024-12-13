@@ -122,6 +122,7 @@ export default function generateEpubHtml(
   let currentMainChapterIndex = 0;
   let previousCharacterCount = 0;
   let currentCharCount = 0;
+  let uniqueKanji = new Set<string>();
 
   itemRefs.forEach((item) => {
     let itemIdRef = item["@_idref"];
@@ -151,7 +152,7 @@ export default function generateEpubHtml(
       body = potentialBody;
     }
 
-    currentCharCount += countForElement(body);
+    currentCharCount += countForElement(body, uniqueKanji);
 
     const mainChapterIndex = mainChapters.findIndex((chapter) =>
       chapter.reference.includes(htmlHref.split("/").pop() || ""),
@@ -192,19 +193,20 @@ export default function generateEpubHtml(
 
   return {
     characters: currentCharCount,
+    uniqueKanji: uniqueKanji.size,
     sections: sectionData.filter((item: Section) =>
       item.reference.startsWith(prependValue),
     ),
   };
 }
 
-function countForElement(containerEl: Node) {
+function countForElement(containerEl: Node, uniqueKanji: Set<string>) {
   const paragraphs = getParagraphNodes(containerEl);
 
   let characterCount = 0;
 
   paragraphs.forEach((node) => {
-    characterCount += getCharacterCount(node);
+    characterCount += getCharacterCount(node, uniqueKanji);
   });
 
   return characterCount;
