@@ -122,7 +122,7 @@ export default function generateEpubHtml(
   let currentMainChapterIndex = 0;
   let previousCharacterCount = 0;
   let currentCharCount = 0;
-  let uniqueKanji = new Set<string>();
+  const uniqueKanji = new Map<string, number>();
 
   itemRefs.forEach((item) => {
     let itemIdRef = item["@_idref"];
@@ -191,16 +191,22 @@ export default function generateEpubHtml(
     previousCharacterCount = currentCharCount;
   });
 
+  let uniqueKanjiUsedOnce = 0;
+  for (const count of uniqueKanji.values()) {
+    if (count === 1) uniqueKanjiUsedOnce++;
+  }
+
   return {
     characters: currentCharCount,
     uniqueKanji: uniqueKanji.size,
+    uniqueKanjiUsedOnce,
     sections: sectionData.filter((item: Section) =>
       item.reference.startsWith(prependValue),
     ),
   };
 }
 
-function countForElement(containerEl: Node, uniqueKanji: Set<string>) {
+function countForElement(containerEl: Node, uniqueKanji: Map<string, number>) {
   const paragraphs = getParagraphNodes(containerEl);
 
   let characterCount = 0;

@@ -19,6 +19,8 @@ const headers = [
   { label: "title", width: longestFileNameWidth },
   { label: "characters" },
   { label: "unique kanji" },
+  { label: "kanji used once" },
+  { label: "kanji used once (%)" },
 ];
 
 let header = "";
@@ -31,9 +33,15 @@ for (const [i, { label, width = label.length }] of headers.entries()) {
 console.log(header);
 console.log("-".repeat(header.length));
 for (const { path, title } of files) {
-  const { characters, uniqueKanji } = await loadEpub(path);
+  const { characters, uniqueKanji, uniqueKanjiUsedOnce } = await loadEpub(path);
 
-  const rowData = [title, characters, uniqueKanji];
+  const rowData = [
+    title,
+    characters,
+    uniqueKanji,
+    uniqueKanjiUsedOnce,
+    `${Math.round((uniqueKanjiUsedOnce / uniqueKanji) * 100)}%`,
+  ];
   let row = "";
   for (const [i, { label, width = label.length }] of headers.entries()) {
     const data = rowData[i] || "";
