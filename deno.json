@@ -3,6 +3,7 @@
     "stats": "deno run -RE main.ts"
   },
   "imports": {
+    "@std/cli": "jsr:@std/cli@^1.0.14",
     "@std/path": "jsr:@std/path@^1.0.8",
     "@types/jsdom": "npm:@types/jsdom@^21.1.7",
     "@zip.js/zip.js": "npm:@zip.js/zip.js@^2.7.54",
