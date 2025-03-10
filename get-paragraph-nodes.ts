@@ -9,7 +9,7 @@ import { isNodeGaiji } from "./is-node-gaiji.ts";
 
 export function getParagraphNodes(node: Node) {
   return getTextNodeOrGaijiNodes(node, (n) => {
-    if (n.nodeName === "RT") {
+    if (n.nodeName === "rt") {
       return false;
     }
     const isHidden =

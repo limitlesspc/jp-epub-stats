@@ -4,7 +4,7 @@ import stringWidth from "string-width";
 import loadEpub from "./load-epub.ts";
 
 const args = parseArgs(Deno.args, {
-  boolean: ["csv"],
+  boolean: ["csv", "output-text"],
 });
 
 const filePaths = args._.map(String);
