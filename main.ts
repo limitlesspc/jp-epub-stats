@@ -21,9 +21,9 @@ if (args.csv) {
     "title,characters,unique kanji,kanji used once,kanji used once (%)",
   );
 
-  for (const { path, title } of files) {
-    const { characters, uniqueKanji, uniqueKanjiUsedOnce } =
-      await loadEpub(path);
+  for (const { path: filePath, title } of files) {
+    const { characters, uniqueKanji, uniqueKanjiUsedOnce, texts } =
+      await loadEpub(filePath);
 
     const rowData = [
       title,
@@ -33,6 +33,19 @@ if (args.csv) {
       `${Math.round((uniqueKanjiUsedOnce / uniqueKanji) * 100)}%`,
     ];
     console.log(rowData.join(","));
+
+    if (args["output-text"]) {
+      const parsedPath = path.parse(filePath);
+      const textPath = path.format({
+        dir: parsedPath.dir,
+        name: parsedPath.name,
+        ext: ".txt",
+      });
+      await Deno.writeTextFile(
+        textPath,
+        texts.map((paragraphs) => paragraphs.join("") || "").join("\n\n"),
+      );
+    }
   }
 } else {
   const longestFileNameWidth = Math.max(
