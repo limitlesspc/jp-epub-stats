@@ -123,7 +123,7 @@ export default function generateEpubHtml(
   let previousCharacterCount = 0;
   let currentCharCount = 0;
   const uniqueKanji = new Map<string, number>();
-  const texts: string[][] = [];
+  const texts: string[] = [];
 
   itemRefs.forEach((item) => {
     let itemIdRef = item["@_idref"];
@@ -191,7 +191,7 @@ export default function generateEpubHtml(
     }
 
     previousCharacterCount = currentCharCount;
-    texts.push(results.paragraphs);
+    texts.push(results.text);
   });
 
   let uniqueKanjiUsedOnce = 0;
@@ -214,15 +214,13 @@ function countForElement(containerEl: Node, uniqueKanji: Map<string, number>) {
   const paragraphs = getParagraphNodes(containerEl);
 
   let characterCount = 0;
-  const texts: string[] = [];
 
   paragraphs.forEach((node) => {
     characterCount += getCharacterCount(node, uniqueKanji);
-    if (node.textContent) texts.push(node.textContent);
   });
 
   return {
-    paragraphs: texts,
+    text: containerEl.textContent?.trim() || "",
     characterCount,
   };
 }

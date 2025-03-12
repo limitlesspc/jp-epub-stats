@@ -9,7 +9,8 @@ import { isNodeGaiji } from "./is-node-gaiji.ts";
 
 export function getParagraphNodes(node: Node) {
   return getTextNodeOrGaijiNodes(node, (n) => {
-    if (n.nodeName.toLowerCase() === "rt") {
+    if (n.nodeName === "rt") {
+      n.parentNode?.removeChild(n);
       return false;
     }
     const isHidden =
@@ -17,6 +18,7 @@ export function getParagraphNodes(node: Node) {
       (n.attributes.getNamedItem("aria-hidden") ||
         n.attributes.getNamedItem("hidden"));
     if (isHidden) {
+      n.parentNode?.removeChild(n);
       return false;
     }
     return true;

@@ -41,10 +41,7 @@ if (args.csv) {
         name: parsedPath.name,
         ext: ".txt",
       });
-      await Deno.writeTextFile(
-        textPath,
-        texts.map((paragraphs) => paragraphs.join("") || "").join("\n\n"),
-      );
+      await Deno.writeTextFile(textPath, texts.join("\n\n"));
     }
   }
 } else {
@@ -70,9 +67,9 @@ if (args.csv) {
   }
   console.log(header);
   console.log("-".repeat(header.length));
-  for (const { path, title } of files) {
-    const { characters, uniqueKanji, uniqueKanjiUsedOnce } =
-      await loadEpub(path);
+  for (const { path: filePath, title } of files) {
+    const { characters, uniqueKanji, uniqueKanjiUsedOnce, texts } =
+      await loadEpub(filePath);
 
     const rowData = [
       title,
@@ -91,5 +88,15 @@ if (args.csv) {
       }
     }
     console.log(row);
+
+    if (args["output-text"]) {
+      const parsedPath = path.parse(filePath);
+      const textPath = path.format({
+        dir: parsedPath.dir,
+        name: parsedPath.name,
+        ext: ".txt",
+      });
+      await Deno.writeTextFile(textPath, texts.join("\n\n"));
+    }
   }
 }
