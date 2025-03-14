@@ -22,7 +22,7 @@ if (args.csv) {
   );
 
   for (const { path: filePath, title } of files) {
-    const { characters, uniqueKanji, uniqueKanjiUsedOnce, texts } =
+    const { characters, uniqueKanji, uniqueKanjiUsedOnce, sections } =
       await loadEpub(filePath);
 
     const rowData = [
@@ -41,7 +41,16 @@ if (args.csv) {
         name: parsedPath.name,
         ext: ".txt",
       });
-      await Deno.writeTextFile(textPath, texts.join("\n\n"));
+
+      let content = "";
+      for (const { label, text, parentChapter } of sections) {
+        if (label) content += "\n\n\n${label}\n\n";
+        if (text) {
+          if (!parentChapter) content += "\n\n\n";
+          content += `${text}\n`;
+        }
+      }
+      await Deno.writeTextFile(textPath, content);
     }
   }
 } else {

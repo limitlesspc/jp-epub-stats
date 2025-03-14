@@ -22,7 +22,8 @@ export default function generateEpubHtml(
 ) {
   const fallbackData = new Map<string, string>();
 
-  const tocData = { type: 3, content: "" };
+  let tocData = { type: 3, content: "" };
+  let navKey = "";
 
   const itemIdToHtmlRef = (
     isOPFType(contents)
@@ -38,9 +39,24 @@ export default function generateEpubHtml(
       item["@_media-type"] === "text/html"
     ) {
       acc[item["@_id"]] = item["@_href"];
+
+      if (item["@_properties"] === "nav") {
+        navKey = item["@_href"];
+      }
     }
     return acc;
   }, {});
+
+  for (const [key, value] of Object.entries(data)) {
+    const isV2Toc = key.endsWith(".ncx") && !tocData.content;
+
+    if (isV2Toc || navKey === key) {
+      tocData = {
+        type: isV2Toc ? 2 : 3,
+        content: value as string,
+      };
+    }
+  }
 
   const parser = new window.DOMParser();
   const spineItemRef = isOPFType(contents)
@@ -123,7 +139,6 @@ export default function generateEpubHtml(
   let previousCharacterCount = 0;
   let currentCharCount = 0;
   const uniqueKanji = new Map<string, number>();
-  const texts: string[] = [];
 
   itemRefs.forEach((item) => {
     let itemIdRef = item["@_idref"];
@@ -179,6 +194,7 @@ export default function generateEpubHtml(
             (sectionData[oldMainChapterIndex].characters as number)
           : 0,
         characters,
+        text: results.text,
       });
     } else if (currentMainChapter) {
       (sectionData[currentMainChapterIndex].characters as number) += characters;
@@ -187,11 +203,11 @@ export default function generateEpubHtml(
         reference: `${prependValue}${itemIdRef}`,
         charactersWeight: characters || 1,
         parentChapter: currentMainChapterId,
+        text: results.text,
       });
     }
 
     previousCharacterCount = currentCharCount;
-    texts.push(results.text);
   });
 
   let uniqueKanjiUsedOnce = 0;
@@ -206,7 +222,6 @@ export default function generateEpubHtml(
     sections: sectionData.filter((item: Section) =>
       item.reference.startsWith(prependValue),
     ),
-    texts,
   };
 }
 

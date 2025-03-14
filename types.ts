@@ -11,6 +11,7 @@ export interface Section {
   startCharacter?: number;
   characters?: number;
   parentChapter?: string;
+  text?: string;
 }
 
 export interface EpubMetadataMeta {
