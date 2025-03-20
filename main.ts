@@ -2,6 +2,7 @@ import { parseArgs } from "@std/cli/parse-args";
 import * as path from "@std/path";
 import stringWidth from "string-width";
 import loadEpub from "./load-epub.ts";
+import { Section } from "./types.ts";
 
 const args = parseArgs(Deno.args, {
   boolean: ["csv", "output-text"],
@@ -41,16 +42,7 @@ if (args.csv) {
         name: parsedPath.name,
         ext: ".txt",
       });
-
-      let content = "";
-      for (const { label, text, parentChapter } of sections) {
-        if (label) content += "\n\n\n${label}\n\n";
-        if (text) {
-          if (!parentChapter) content += "\n\n\n";
-          content += `${text}\n`;
-        }
-      }
-      await Deno.writeTextFile(textPath, content);
+      await Deno.writeTextFile(textPath, sections2Txt(sections));
     }
   }
 } else {
@@ -77,7 +69,7 @@ if (args.csv) {
   console.log(header);
   console.log("-".repeat(header.length));
   for (const { path: filePath, title } of files) {
-    const { characters, uniqueKanji, uniqueKanjiUsedOnce, texts } =
+    const { characters, uniqueKanji, uniqueKanjiUsedOnce, sections } =
       await loadEpub(filePath);
 
     const rowData = [
@@ -105,7 +97,19 @@ if (args.csv) {
         name: parsedPath.name,
         ext: ".txt",
       });
-      await Deno.writeTextFile(textPath, texts.join("\n\n"));
+      await Deno.writeTextFile(textPath, sections2Txt(sections));
     }
   }
+}
+
+function sections2Txt(sections: Section[]) {
+  let content = "";
+  for (const { label, text, parentChapter } of sections) {
+    if (label) content += `\n\n\n${label}\n\n`;
+    if (text) {
+      if (!parentChapter) content += "\n\n\n";
+      content += `${text}\n`;
+    }
+  }
+  return content;
 }

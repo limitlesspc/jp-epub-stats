@@ -94,6 +94,10 @@ export default function generateEpubHtml(
         });
       }
     } else {
+      if (!parsedToc.body?.childNodes?.length) {
+        parsedToc = parser.parseFromString(tocData.content, "text/xml");
+      }
+
       mainChapters = [...parsedToc.querySelectorAll("navPoint")].map((elm) => {
         const navLabel = elm.querySelector("navLabel text") as HTMLElement;
         const contentElm = elm.querySelector("content") as HTMLElement;
