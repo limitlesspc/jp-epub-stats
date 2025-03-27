@@ -5,6 +5,7 @@
  */
 
 import { window } from "./dom.ts";
+import { JSDOM } from "jsdom";
 import {
   isOPFType,
   type EpubContent,
@@ -77,7 +78,8 @@ export default function generateEpubHtml(
       );
 
       if (!navTocElement) {
-        parsedToc = parser.parseFromString(tocData.content, "text/xml");
+        const jsdom = new JSDOM(tocData.content, { contentType: "text/xml" });
+        parsedToc = jsdom.window.document;
         navTocElement = parsedToc.querySelector(
           'nav[epub\\:type="toc"],nav#toc',
         );
@@ -95,8 +97,9 @@ export default function generateEpubHtml(
         });
       }
     } else {
-      if (!parsedToc.body?.childNodes?.length) {
-        parsedToc = parser.parseFromString(tocData.content, "text/xml");
+      if (parsedToc.body.children.item(0)?.tagName === "NCX") {
+        const jsdom = new JSDOM(tocData.content, { contentType: "text/xml" });
+        parsedToc = jsdom.window.document;
       }
 
       mainChapters = [...parsedToc.querySelectorAll("navPoint")].map((elm) => {
