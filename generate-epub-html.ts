@@ -78,9 +78,10 @@ export default function generateEpubHtml(
 
       if (!navTocElement) {
         parsedToc = parser.parseFromString(tocData.content, "text/xml");
+        navTocElement = parsedToc.querySelector(
+          'nav[epub\\:type="toc"],nav#toc',
+        );
       }
-
-      navTocElement = parsedToc.querySelector('nav[epub\\:type="toc"],nav#toc');
 
       if (navTocElement) {
         mainChapters = [...navTocElement.querySelectorAll("a")].map((elm) => {
@@ -89,7 +90,7 @@ export default function generateEpubHtml(
           return {
             reference: anchor.href,
             charactersWeight: 1,
-            label: anchor.innerText,
+            label: anchor.textContent,
           };
         });
       }
@@ -105,7 +106,7 @@ export default function generateEpubHtml(
         return {
           reference: contentElm.getAttribute("src") as string,
           charactersWeight: 1,
-          label: navLabel.innerText,
+          label: navLabel.textContent,
         };
       });
     }
@@ -144,7 +145,7 @@ export default function generateEpubHtml(
   let currentCharCount = 0;
   const uniqueKanji = new Map<string, number>();
 
-  itemRefs.forEach((item) => {
+  for (const item of itemRefs) {
     let itemIdRef = item["@_idref"];
     let htmlHref = itemIdToHtmlRef[itemIdRef];
 
@@ -212,7 +213,7 @@ export default function generateEpubHtml(
     }
 
     previousCharacterCount = currentCharCount;
-  });
+  }
 
   let uniqueKanjiUsedOnce = 0;
   for (const count of uniqueKanji.values()) {
@@ -223,7 +224,7 @@ export default function generateEpubHtml(
     characters: currentCharCount,
     uniqueKanji: uniqueKanji.size,
     uniqueKanjiUsedOnce,
-    sections: sectionData.filter((item: Section) =>
+    sections: sectionData.filter((item) =>
       item.reference.startsWith(prependValue),
     ),
   };
@@ -234,9 +235,9 @@ function countForElement(containerEl: Node, uniqueKanji: Map<string, number>) {
 
   let characterCount = 0;
 
-  paragraphs.forEach((node) => {
+  for (const node of paragraphs) {
     characterCount += getCharacterCount(node, uniqueKanji);
-  });
+  }
 
   return {
     text: containerEl.textContent?.trim() || "",

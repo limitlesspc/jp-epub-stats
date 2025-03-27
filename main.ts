@@ -105,9 +105,9 @@ if (args.csv) {
 function sections2Txt(sections: Section[]) {
   let content = "";
   for (const { label, text, parentChapter } of sections) {
-    if (label) content += `\n\n\n${label}\n\n`;
+    if (label) content += `\n\n\n\n     ${label}\n`;
     if (text) {
-      if (!parentChapter) content += "\n\n\n";
+      if (!parentChapter) content += "\n\n";
       content += `${text}\n`;
     }
   }
