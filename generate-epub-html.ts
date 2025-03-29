@@ -218,15 +218,15 @@ export default function generateEpubHtml(
     previousCharacterCount = currentCharCount;
   }
 
-  let uniqueKanjiUsedOnce = 0;
+  let kanjiUsedOnce = 0;
   for (const count of uniqueKanji.values()) {
-    if (count === 1) uniqueKanjiUsedOnce++;
+    if (count === 1) kanjiUsedOnce++;
   }
 
   return {
     characters: currentCharCount,
     uniqueKanji: uniqueKanji.size,
-    uniqueKanjiUsedOnce,
+    kanjiUsedOnce,
     sections: sectionData.filter((item) =>
       item.reference.startsWith(prependValue),
     ),

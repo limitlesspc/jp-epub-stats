@@ -57,15 +57,17 @@ const longestFileNameWidth = Math.max(
 
 const spacing = 4;
 const headers = [
-  { label: "title", width: longestFileNameWidth },
+  { label: "file", width: longestFileNameWidth },
   { label: "characters" },
-  { label: "unique kanji" },
-  { label: "kanji used once" },
-  { label: "kanji used once (%)" },
 ];
 if (hasSudachi) {
-  headers.push({ label: "words" }, { label: "unique words" });
+  headers.push(
+    { label: "words" },
+    { label: "unique words" },
+    { label: "words used once" },
+  );
 }
+headers.push({ label: "unique kanji" }, { label: "kanji used once" });
 
 const rows = [headers.map((x) => x.label).join(",")];
 
@@ -79,16 +81,10 @@ for (const [i, { label, width = label.length }] of headers.entries()) {
 console.log(header);
 console.log("-".repeat(header.length));
 for (const { path: filePath, title } of files) {
-  const { characters, uniqueKanji, uniqueKanjiUsedOnce, sections } =
+  const { characters, uniqueKanji, kanjiUsedOnce, sections } =
     await loadEpub(filePath);
 
-  const rowData = [
-    title,
-    characters,
-    uniqueKanji,
-    uniqueKanjiUsedOnce,
-    `${Math.round((uniqueKanjiUsedOnce / uniqueKanji) * 100)}%`,
-  ];
+  const rowData = [title, characters];
 
   const parsedPath = path.parse(filePath);
 
@@ -115,18 +111,26 @@ for (const { path: filePath, title } of files) {
 
     const output = new TextDecoder().decode(stdout);
 
-    const uniqueWords = new Set<string>();
+    const uniqueWords = new Map<string, number>();
     let words = 0;
     for (const line of output.split("\n")) {
       const [surface, _tags, _normalized, dictonary] = line.split("\t");
       if (surface.replace(isNotJapaneseRegex, "") && surface !== "EOS") {
-        uniqueWords.add(dictonary);
+        const count = uniqueWords.get(dictonary) || 0;
+        uniqueWords.set(dictonary, count + 1);
         words++;
       }
     }
 
-    rowData.push(words, uniqueWords.size);
+    let wordsUsedOnce = 0;
+    for (const count of uniqueWords.values()) {
+      if (count === 1) wordsUsedOnce++;
+    }
+
+    rowData.push(words, uniqueWords.size, wordsUsedOnce);
   }
+
+  rowData.push(uniqueKanji, kanjiUsedOnce);
 
   let row = "";
   for (const [i, { label, width = label.length }] of headers.entries()) {
