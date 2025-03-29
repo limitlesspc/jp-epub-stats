@@ -160,13 +160,6 @@ for (const { path: filePath, title } of files) {
   }
 
   if (args.csv) {
-    const rowData = [
-      title,
-      characters,
-      uniqueKanji,
-      uniqueKanjiUsedOnce,
-      `${Math.round((uniqueKanjiUsedOnce / uniqueKanji) * 100)}%`,
-    ];
     rows.push(rowData.join(","));
   }
 }
