@@ -2,14 +2,19 @@ import { parseArgs } from "@std/cli/parse-args";
 import * as path from "@std/path";
 import stringWidth from "string-width";
 import loadEpub from "./load-epub.ts";
+import { isNotJapaneseRegex } from "./get-character-count.ts";
 
 const args = parseArgs(Deno.args, {
-  boolean: ["help", "h", "extract", "e"],
+  boolean: ["help", "extract", "verbose"],
   string: ["csv"],
+  alias: {
+    help: "h",
+    extract: "e",
+  },
 });
 const filePaths = args._.map(String);
 
-if (args.help || args.h || !filePaths.length) {
+if (args.help || !filePaths.length) {
   console.log(`Japanese epub stats
 
 Usage: deno run -A main.ts [FILES] [OPTIONS]
@@ -25,8 +30,17 @@ Options:
         Outputs the text extracted from each epub
         If an epub's file name is title.epub, it will output title.txt
   -h, --help
-        Show this help`);
+        Show this help
+  --verbose
+        Shows more information while running`);
   Deno.exit();
+}
+
+const whichCommand = new Deno.Command("which", { args: ["sudachi"] });
+const whichOutput = await whichCommand.output();
+const hasSudachi = whichOutput.success;
+if (args.verbose) {
+  console.error(`Sudachi${hasSudachi ? "" : " not"} detected`);
 }
 
 const files = filePaths.map((filePath) => {
@@ -49,6 +63,9 @@ const headers = [
   { label: "kanji used once" },
   { label: "kanji used once (%)" },
 ];
+if (hasSudachi) {
+  headers.push({ label: "words" }, { label: "unique words" });
+}
 
 const rows = [headers.map((x) => x.label).join(",")];
 
@@ -72,6 +89,45 @@ for (const { path: filePath, title } of files) {
     uniqueKanjiUsedOnce,
     `${Math.round((uniqueKanjiUsedOnce / uniqueKanji) * 100)}%`,
   ];
+
+  const parsedPath = path.parse(filePath);
+
+  if (hasSudachi) {
+    let content = "";
+    for (const { text } of sections) {
+      if (text) {
+        content += text;
+      }
+    }
+
+    const textPath = path.format({
+      dir: parsedPath.dir,
+      name: parsedPath.name,
+      ext: ".sudachi.txt",
+    });
+    await Deno.writeTextFile(textPath, content);
+
+    const sudachiCommand = new Deno.Command("sudachi", {
+      args: ["--all", textPath],
+    });
+    const { stdout } = await sudachiCommand.output();
+    await Deno.remove(textPath);
+
+    const output = new TextDecoder().decode(stdout);
+
+    const uniqueWords = new Set<string>();
+    let words = 0;
+    for (const line of output.split("\n")) {
+      const [surface, _tags, _normalized, dictonary] = line.split("\t");
+      if (surface.replace(isNotJapaneseRegex, "") && surface !== "EOS") {
+        uniqueWords.add(dictonary);
+        words++;
+      }
+    }
+
+    rowData.push(words, uniqueWords.size);
+  }
+
   let row = "";
   for (const [i, { label, width = label.length }] of headers.entries()) {
     const data = rowData[i] || "";
@@ -84,7 +140,6 @@ for (const { path: filePath, title } of files) {
   console.log(row);
 
   if (args.extract) {
-    const parsedPath = path.parse(filePath);
     const textPath = path.format({
       dir: parsedPath.dir,
       name: parsedPath.name,

@@ -13,7 +13,7 @@ export function getCharacterCount(
   return isNodeGaiji(node) ? 1 : getRawCharacterCount(node, uniqueKanji);
 }
 
-const isNotJapaneseRegex =
+export const isNotJapaneseRegex =
   /[^0-9A-Z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚｦ-ﾝ\p{Radical}\p{Unified_Ideograph}]+/gimu;
 const kanjiRegex = /[\u4e00-\u9faf]|[\u3400-\u4dbf]/;
 
