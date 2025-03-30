@@ -9,6 +9,7 @@
     "@zip.js/zip.js": "npm:@zip.js/zip.js@^2.7.54",
     "fast-xml-parser": "npm:fast-xml-parser@^4.5.0",
     "jsdom": "npm:jsdom@^25.0.1",
-    "string-width": "npm:string-width@^7.2.0"
+    "string-width": "npm:string-width@^7.2.0",
+    "wanakana": "npm:wanakana@^5.3.1"
   }
 }

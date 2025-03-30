@@ -3,6 +3,7 @@
  * Copyright (c) 2024, ッツ Reader Authors
  * All rights reserved.
  */
+// Implemented from https://github.com/ttu-ttu/ebook-reader/blob/main/apps/web/src/lib/functions/file-loaders/epub/generate-epub-html.ts
 
 import { window } from "./dom.ts";
 import { JSDOM } from "jsdom";
@@ -14,6 +15,7 @@ import {
 } from "./types.ts";
 import { getCharacterCount } from "./get-character-count.ts";
 import { getParagraphNodes } from "./get-paragraph-nodes.ts";
+import { isKanji } from "wanakana";
 
 export const prependValue = "ttu-";
 
@@ -92,7 +94,7 @@ export default function generateEpubHtml(
           return {
             reference: anchor.href,
             charactersWeight: 1,
-            label: anchor.textContent,
+            label: anchor.textContent || "",
           };
         });
       }
@@ -109,7 +111,7 @@ export default function generateEpubHtml(
         return {
           reference: contentElm.getAttribute("src") as string,
           charactersWeight: 1,
-          label: navLabel.textContent,
+          label: navLabel.textContent || "",
         };
       });
     }
@@ -146,7 +148,6 @@ export default function generateEpubHtml(
   let currentMainChapterIndex = 0;
   let previousCharacterCount = 0;
   let currentCharCount = 0;
-  const uniqueKanji = new Map<string, number>();
 
   for (const item of itemRefs) {
     let itemIdRef = item["@_idref"];
@@ -176,7 +177,7 @@ export default function generateEpubHtml(
       body = potentialBody;
     }
 
-    const results = countForElement(body, uniqueKanji);
+    const results = countForElement(body);
     currentCharCount += results.characterCount;
 
     const mainChapterIndex = mainChapters.findIndex((chapter) =>
@@ -218,6 +219,21 @@ export default function generateEpubHtml(
     previousCharacterCount = currentCharCount;
   }
 
+  const sections = sectionData.filter((item) =>
+    item.reference.startsWith(prependValue),
+  );
+
+  const uniqueKanji = new Map<string, number>();
+  for (const { text = "" } of sections) {
+    const chars = Array.from(text);
+    for (const char of chars) {
+      if (isKanji(char)) {
+        const count = uniqueKanji.get(char) || 0;
+        uniqueKanji.set(char, count + 1);
+      }
+    }
+  }
+
   let kanjiUsedOnce = 0;
   for (const count of uniqueKanji.values()) {
     if (count === 1) kanjiUsedOnce++;
@@ -226,20 +242,18 @@ export default function generateEpubHtml(
   return {
     characters: currentCharCount,
     uniqueKanji: uniqueKanji.size,
-    kanjiUsedOnce,
-    sections: sectionData.filter((item) =>
-      item.reference.startsWith(prependValue),
-    ),
+    uniqueKanjiUsedOnce: kanjiUsedOnce,
+    sections,
   };
 }
 
-function countForElement(containerEl: Node, uniqueKanji: Map<string, number>) {
+function countForElement(containerEl: Node) {
   const paragraphs = getParagraphNodes(containerEl);
 
   let characterCount = 0;
 
   for (const node of paragraphs) {
-    characterCount += getCharacterCount(node, uniqueKanji);
+    characterCount += getCharacterCount(node);
   }
 
   return {

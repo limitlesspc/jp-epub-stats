@@ -2,7 +2,7 @@ import { parseArgs } from "@std/cli/parse-args";
 import * as path from "@std/path";
 import stringWidth from "string-width";
 import loadEpub from "./load-epub.ts";
-import { isNotJapaneseRegex } from "./get-character-count.ts";
+import { Process } from "./sudachi/mod.ts";
 
 const args = parseArgs(Deno.args, {
   boolean: ["help", "extract", "verbose"],
@@ -81,7 +81,7 @@ for (const [i, { label, width = label.length }] of headers.entries()) {
 console.log(header);
 console.log("-".repeat(header.length));
 for (const { path: filePath, title } of files) {
-  const { characters, uniqueKanji, kanjiUsedOnce, sections } =
+  const { characters, uniqueKanji, uniqueKanjiUsedOnce, sections } =
     await loadEpub(filePath);
 
   const rowData = [title, characters];
@@ -92,7 +92,7 @@ for (const { path: filePath, title } of files) {
     let content = "";
     for (const { text } of sections) {
       if (text) {
-        content += text;
+        content += `${text}\n`;
       }
     }
 
@@ -111,26 +111,15 @@ for (const { path: filePath, title } of files) {
 
     const output = new TextDecoder().decode(stdout);
 
-    const uniqueWords = new Map<string, number>();
-    let words = 0;
-    for (const line of output.split("\n")) {
-      const [surface, _tags, _normalized, dictonary] = line.split("\t");
-      if (surface.replace(isNotJapaneseRegex, "") && surface !== "EOS") {
-        const count = uniqueWords.get(dictonary) || 0;
-        uniqueWords.set(dictonary, count + 1);
-        words++;
-      }
-    }
+    const { wordCount, uniqueWordCount, uniqueWordUsedOnceCount } = Process(
+      content,
+      output,
+    );
 
-    let wordsUsedOnce = 0;
-    for (const count of uniqueWords.values()) {
-      if (count === 1) wordsUsedOnce++;
-    }
-
-    rowData.push(words, uniqueWords.size, wordsUsedOnce);
+    rowData.push(wordCount, uniqueWordCount, uniqueWordUsedOnceCount);
   }
 
-  rowData.push(uniqueKanji, kanjiUsedOnce);
+  rowData.push(uniqueKanji, uniqueKanjiUsedOnce);
 
   let row = "";
   for (const [i, { label, width = label.length }] of headers.entries()) {
@@ -171,3 +160,4 @@ for (const { path: filePath, title } of files) {
 if (args.csv) {
   await Deno.writeTextFile(args.csv, rows.join("\n"));
 }
+Deno.exit();

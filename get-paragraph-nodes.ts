@@ -3,6 +3,7 @@
  * Copyright (c) 2024, ッツ Reader Authors
  * All rights reserved.
  */
+// Implemented from https://github.com/ttu-ttu/ebook-reader/blob/main/apps/web/src/lib/components/book-reader/get-paragraph-nodes.ts
 
 import { window } from "./dom.ts";
 import { isNodeGaiji } from "./is-node-gaiji.ts";

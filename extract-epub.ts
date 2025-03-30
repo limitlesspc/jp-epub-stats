@@ -3,6 +3,7 @@
  * Copyright (c) 2024, ッツ Reader Authors
  * All rights reserved.
  */
+// Implemented from https://github.com/ttu-ttu/ebook-reader/blob/main/apps/web/src/lib/functions/file-loaders/epub/extract-epub.ts
 
 import { BlobReader, BlobWriter, TextWriter, ZipReader } from "@zip.js/zip.js";
 import { isOPFType, type EpubContent, type EpubOPFContent } from "./types.ts";

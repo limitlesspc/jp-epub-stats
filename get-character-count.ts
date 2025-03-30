@@ -3,25 +3,21 @@
  * Copyright (c) 2024, ッツ Reader Authors
  * All rights reserved.
  */
+// Implemented from https://github.com/ttu-ttu/ebook-reader/blob/main/apps/web/src/lib/functions/get-character-count.ts
 
 import { isNodeGaiji } from "./is-node-gaiji.ts";
 
-export function getCharacterCount(
-  node: Node,
-  uniqueKanji: Map<string, number>,
-) {
-  return isNodeGaiji(node) ? 1 : getRawCharacterCount(node, uniqueKanji);
+export function getCharacterCount(node: Node) {
+  return isNodeGaiji(node) ? 1 : getRawCharacterCount(node);
 }
 
-export const isNotJapaneseRegex =
+const isNotJapaneseRegex =
   /[^0-9A-Z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚｦ-ﾝ\p{Radical}\p{Unified_Ideograph}]+/gimu;
-const kanjiRegex = /[\u4e00-\u9faf]|[\u3400-\u4dbf]/;
 
-function getRawCharacterCount(node: Node, uniqueKanji: Map<string, number>) {
+function getRawCharacterCount(node: Node) {
   if (!node.textContent) return 0;
   return countUnicodeCharacters(
     node.textContent.replace(isNotJapaneseRegex, ""),
-    uniqueKanji,
   );
 }
 
@@ -29,13 +25,7 @@ function getRawCharacterCount(node: Node, uniqueKanji: Map<string, number>) {
  * Because '𠮟る'.length = 3
  * Reference: https://dmitripavlutin.com/what-every-javascript-developer-should-know-about-unicode/#length-and-surrogate-pairs
  */
-function countUnicodeCharacters(s: string, uniqueKanji: Map<string, number>) {
+function countUnicodeCharacters(s: string) {
   const chars = Array.from(s);
-  for (const char of chars) {
-    if (kanjiRegex.test(char)) {
-      const count = uniqueKanji.get(char) || 0;
-      uniqueKanji.set(char, count + 1);
-    }
-  }
   return chars.length;
 }
