@@ -10,7 +10,7 @@ import { isNodeGaiji } from "./is-node-gaiji.ts";
 
 export function getParagraphNodes(node: Node) {
   return getTextNodeOrGaijiNodes(node, (n) => {
-    if (n.nodeName === "rt") {
+    if (n.nodeName.toLowerCase() === "rt") {
       n.parentNode?.removeChild(n);
       return false;
     }
