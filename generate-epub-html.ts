@@ -158,17 +158,12 @@ export default function generateEpubHtml(
       htmlHref = itemIdToHtmlRef[itemIdRef];
     }
 
-    let parsedContent = parser.parseFromString(
-      data[htmlHref] as string,
-      "text/html",
-    );
+    const html = String(data[htmlHref]).replaceAll(/\/p><p/g, "/p>\n<p");
+    let parsedContent = parser.parseFromString(html, "text/html");
     let body = parsedContent.body;
 
     if (!body?.childNodes?.length) {
-      parsedContent = parser.parseFromString(
-        data[htmlHref] as string,
-        "text/xml",
-      );
+      parsedContent = parser.parseFromString(html, "text/xml");
       const potentialBody = parsedContent.querySelector("body"); // XMLDocument doesn't seem to have the body property
 
       if (!potentialBody?.childNodes?.length) {

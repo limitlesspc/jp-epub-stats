@@ -10,9 +10,13 @@ import { isNodeGaiji } from "./is-node-gaiji.ts";
 
 export function getParagraphNodes(node: Node) {
   return getTextNodeOrGaijiNodes(node, (n) => {
-    if (n.nodeName.toLowerCase() === "rt") {
-      n.parentNode?.removeChild(n);
-      return false;
+    if (n.nodeName.toLowerCase() === "ruby") {
+      for (const child of n.childNodes) {
+        if (child.nodeName.toLowerCase() === "rt") {
+          n.removeChild(child);
+        }
+      }
+      n.textContent &&= n.textContent?.replaceAll(/\s/g, "");
     }
     const isHidden =
       n instanceof window.HTMLElement &&
