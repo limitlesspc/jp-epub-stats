@@ -1,27 +1,29 @@
 import { parseArgs } from "@std/cli/parse-args";
 import * as path from "@std/path";
-import stringWidth from "string-width";
+import { bold } from "@std/fmt/colors";
+import { z } from "zod";
 import loadEpub from "./load-epub.ts";
 import { Process } from "./sudachi/mod.ts";
 
 const args = parseArgs(Deno.args, {
-  boolean: ["help", "extract", "verbose"],
+  boolean: ["help", "extract", "save", "verbose"],
   string: ["csv"],
   alias: {
     help: "h",
     extract: "e",
+    save: "s",
   },
 });
-const filePaths = args._.map(String);
+const paths = args._.map(String);
 
-if (args.help || !filePaths.length) {
+if (args.help || !paths.length) {
   console.log(`Japanese epub stats
 
 Usage: deno run -A main.ts [FILES] [OPTIONS]
 
 Arguments:
   [FILES]
-        Input epub files to calculate stats
+        Input epub files or directories to calculate stats
 
 Options:
   --csv <STATS_FILE>
@@ -29,6 +31,9 @@ Options:
   --extract
         Outputs the text extracted from each epub
         If an epub's file name is title.epub, it will output title.txt
+  -s, --save
+        Saves a 'stats.json' file in each directory so that when new books are added in the future
+        existing books don't need to be processed again
   -h, --help
         Show this help
   --verbose
@@ -43,121 +48,207 @@ if (args.verbose) {
   console.error(`Sudachi${hasSudachi ? "" : " not"} detected`);
 }
 
-const files = filePaths.map((filePath) => {
-  const { dir, name } = path.parse(filePath);
-  return {
-    path: filePath,
-    title: dir ? `${dir}/${name}` : name,
-  };
-});
-
-const longestFileNameWidth = Math.max(
-  ...files.map(({ title }) => stringWidth(title)),
-);
-
 const spacing = 4;
-const headers = [
-  { label: "file", width: longestFileNameWidth },
-  { label: "characters" },
-];
+const headers = ["characters"];
 if (hasSudachi) {
-  headers.push(
-    { label: "words" },
-    { label: "unique words" },
-    { label: "words used once" },
-  );
+  headers.push("words", "unique words", "words used once");
 }
-headers.push({ label: "unique kanji" }, { label: "kanji used once" });
+headers.push("unique kanji", "kanji used once");
 
-const rows = [headers.map((x) => x.label).join(",")];
+const savedBookDataSchema = z.object({
+  name: z.string(),
+  characters: z.number(),
+  words: z.number().optional(),
+  uniqueWords: z.number().optional(),
+  wordsUsedOnce: z.number().optional(),
+  uniqueKanji: z.number(),
+  kanjiUsedOnce: z.number(),
+});
+type SavedBookData = z.infer<typeof savedBookDataSchema>;
+const VERSION = "2025-07-02";
+const savedDataSchema = z.object({
+  version: z.literal(VERSION),
+  books: z.array(savedBookDataSchema),
+});
+type SavedData = z.infer<typeof savedDataSchema>;
 
-let header = "";
-for (const [i, { label, width = label.length }] of headers.entries()) {
-  header += label;
-  if (i < headers.length - 1) {
-    header += " ".repeat(width - label.length + spacing);
+async function processFile(
+  filePath: string,
+  savedData?: SavedBookData,
+  preTitle?: string,
+): Promise<SavedBookData> {
+  if (hasSudachi && !savedData?.words) {
+    savedData = undefined;
   }
-}
-console.log(header);
-console.log("-".repeat(header.length));
-for (const { path: filePath, title } of files) {
-  const { characters, uniqueKanji, uniqueKanjiUsedOnce, sections } =
-    await loadEpub(filePath);
-
-  const rowData = [title, characters];
 
   const parsedPath = path.parse(filePath);
+  const { name } = parsedPath;
 
-  if (hasSudachi) {
-    let content = "";
-    for (const { text } of sections) {
-      if (text) {
-        content += `${text}\n`;
+  console.log(
+    `${preTitle ? `${preTitle} ` : ""}${bold(`======= ${name} =======`)}`,
+  );
+  let header = "";
+  for (const [i, label] of headers.entries()) {
+    header += label;
+    if (i < headers.length - 1) {
+      header += " ".repeat(spacing);
+    }
+  }
+  console.log(header);
+  console.log("-".repeat(header.length));
+
+  const rowData: number[] = [];
+  if (savedData) {
+    rowData.push(
+      savedData.characters,
+      savedData.words || 0,
+      savedData.uniqueWords || 0,
+      savedData.wordsUsedOnce || 0,
+      savedData.uniqueKanji,
+      savedData.kanjiUsedOnce,
+    );
+  } else {
+    const { characters, uniqueKanji, uniqueKanjiUsedOnce, sections } =
+      await loadEpub(filePath);
+    savedData = {
+      name,
+      characters,
+      uniqueKanji,
+      kanjiUsedOnce: uniqueKanjiUsedOnce,
+    };
+
+    rowData.push(characters);
+
+    if (hasSudachi) {
+      let content = "";
+      for (const { text } of sections) {
+        if (text) {
+          content += `${text}\n`;
+        }
       }
+
+      const textPath = path.format({
+        dir: parsedPath.dir,
+        name: parsedPath.name,
+        ext: ".sudachi.txt",
+      });
+      await Deno.writeTextFile(textPath, content);
+
+      const sudachiCommand = new Deno.Command("sudachi", {
+        args: ["--all", textPath],
+      });
+      const { stdout } = await sudachiCommand.output();
+      await Deno.remove(textPath);
+
+      const output = new TextDecoder().decode(stdout);
+
+      const { wordCount, uniqueWordCount, uniqueWordUsedOnceCount } = Process(
+        content,
+        output,
+      );
+
+      rowData.push(wordCount, uniqueWordCount, uniqueWordUsedOnceCount);
+      savedData.words = wordCount;
+      savedData.uniqueWords = uniqueWordCount;
+      savedData.wordsUsedOnce = uniqueWordUsedOnceCount;
     }
 
-    const textPath = path.format({
-      dir: parsedPath.dir,
-      name: parsedPath.name,
-      ext: ".sudachi.txt",
-    });
-    await Deno.writeTextFile(textPath, content);
+    rowData.push(uniqueKanji, uniqueKanjiUsedOnce);
 
-    const sudachiCommand = new Deno.Command("sudachi", {
-      args: ["--all", textPath],
-    });
-    const { stdout } = await sudachiCommand.output();
-    await Deno.remove(textPath);
+    if (args.extract) {
+      const textPath = path.format({
+        dir: parsedPath.dir,
+        name: parsedPath.name,
+        ext: ".txt",
+      });
 
-    const output = new TextDecoder().decode(stdout);
+      let content = "";
+      for (const { label, text, parentChapter } of sections) {
+        if (label && !text?.trimStart().startsWith(label))
+          content += `\n\n\n\n     ${label}\n`;
+        if (text) {
+          if (!parentChapter) content += "\n\n";
+          content += `\n${text}\n`;
+        }
+      }
 
-    const { wordCount, uniqueWordCount, uniqueWordUsedOnceCount } = Process(
-      content,
-      output,
-    );
-
-    rowData.push(wordCount, uniqueWordCount, uniqueWordUsedOnceCount);
+      await Deno.writeTextFile(textPath, content);
+    }
   }
 
-  rowData.push(uniqueKanji, uniqueKanjiUsedOnce);
-
   let row = "";
-  for (const [i, { label, width = label.length }] of headers.entries()) {
+  for (const [i, label] of headers.entries()) {
     const data = rowData[i] || "";
     const str = data.toString();
     row += str;
     if (i < headers.length - 1) {
-      row += " ".repeat(width - stringWidth(str) + spacing);
+      row += " ".repeat(label.length - str.length + spacing);
     }
   }
-  console.log(row);
+  console.log(`${row}\n`);
 
-  if (args.extract) {
-    const textPath = path.format({
-      dir: parsedPath.dir,
-      name: parsedPath.name,
-      ext: ".txt",
-    });
+  return savedData;
+}
 
-    let content = "";
-    for (const { label, text, parentChapter } of sections) {
-      if (label && !text?.trimStart().startsWith(label))
-        content += `\n\n\n\n     ${label}\n`;
-      if (text) {
-        if (!parentChapter) content += "\n\n";
-        content += `\n${text}\n`;
-      }
+for (const filePath of paths) {
+  const fileInfo = await Deno.stat(filePath);
+  if (fileInfo.isDirectory) {
+    let savedData: SavedData | undefined;
+    const statsPath = path.join(filePath, "stats.json");
+    if (args.save) {
+      try {
+        const json = await Deno.readTextFile(statsPath);
+        savedData = savedDataSchema.parse(JSON.parse(json));
+      } catch {}
     }
 
-    await Deno.writeTextFile(textPath, content);
-  }
+    const data: SavedData = {
+      version: VERSION,
+      books: [],
+    };
 
-  if (args.csv) {
-    rows.push(rowData.join(","));
+    const entries = [...Deno.readDirSync(filePath)]
+      .filter((x) => x.isFile && x.name.endsWith(".epub"))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const lenStr = entries.length.toString();
+    for (const [i, { name }] of entries.entries()) {
+      const innerFilePath = path.join(filePath, name);
+      const parsedPath = path.parse(innerFilePath);
+      data.books.push(
+        await processFile(
+          innerFilePath,
+          savedData?.books.find((x) => x.name === parsedPath.name),
+          `${(i + 1).toString().padStart(lenStr.length, " ")} / ${lenStr}`,
+        ),
+      );
+    }
+
+    if (args.save) {
+      await Deno.writeTextFile(statsPath, JSON.stringify(data, null, 2));
+    }
+    if (args.csv) {
+      const csvPath = path.join(filePath, args.csv);
+
+      const rows = [`name,${headers.join(",")}`];
+      rows.push(
+        ...data.books.map((x) =>
+          [
+            x.name,
+            x.characters,
+            x.words || "",
+            x.uniqueWords || "",
+            x.wordsUsedOnce || "",
+            x.uniqueKanji,
+            x.kanjiUsedOnce,
+          ].join(","),
+        ),
+      );
+
+      await Deno.writeTextFile(csvPath, rows.join("\n"));
+    }
+  } else {
+    await processFile(filePath);
   }
 }
 
-if (args.csv) {
-  await Deno.writeTextFile(args.csv, rows.join("\n"));
-}
 Deno.exit();

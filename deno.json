@@ -4,12 +4,13 @@
   },
   "imports": {
     "@std/cli": "jsr:@std/cli@^1.0.14",
+    "@std/fmt": "jsr:@std/fmt@^1.0.8",
     "@std/path": "jsr:@std/path@^1.0.8",
     "@types/jsdom": "npm:@types/jsdom@^21.1.7",
     "@zip.js/zip.js": "npm:@zip.js/zip.js@^2.7.54",
     "fast-xml-parser": "npm:fast-xml-parser@^4.5.0",
     "jsdom": "npm:jsdom@^25.0.1",
-    "string-width": "npm:string-width@^7.2.0",
-    "wanakana": "npm:wanakana@^5.3.1"
+    "wanakana": "npm:wanakana@^5.3.1",
+    "zod": "npm:zod@^3.25.69"
   }
 }
