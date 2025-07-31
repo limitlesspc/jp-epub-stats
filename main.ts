@@ -8,10 +8,12 @@ import { Process } from "./sudachi/mod.ts";
 const args = parseArgs(Deno.args, {
   boolean: ["help", "extract", "save", "verbose"],
   string: ["csv"],
+  collect: ["ignore"],
   alias: {
     help: "h",
     extract: "e",
     save: "s",
+    ignore: "i",
   },
 });
 const paths = args._.map(String);
@@ -24,6 +26,7 @@ Usage: deno run -A main.ts [FILES] [OPTIONS]
 Arguments:
   [FILES]
         Input epub files or directories to calculate stats
+        Sub-directories will be considered a series
 
 Options:
   --csv <STATS_FILE>
@@ -34,6 +37,8 @@ Options:
   -s, --save
         Saves a 'stats.json' file in each directory so that when new books are added in the future
         existing books don't need to be processed again
+  -i, --ignore <SERIES_TITLE>
+        Prevent a directory from being included as a series
   -h, --help
         Show this help
   --verbose
@@ -72,17 +77,25 @@ const savedDataSchema = z.object({
 });
 type SavedData = z.infer<typeof savedDataSchema>;
 
-async function processFile(
-  filePath: string,
-  savedData?: SavedBookData,
-  preTitle?: string,
-): Promise<SavedBookData> {
+async function processFile({
+  filePath,
+  name,
+  savedData,
+  preTitle,
+}: {
+  filePath: string;
+  name?: string;
+  savedData?: SavedBookData;
+  preTitle?: string;
+}): Promise<SavedBookData> {
   if (hasSudachi && !savedData?.words) {
     savedData = undefined;
   }
 
   const parsedPath = path.parse(filePath);
-  const { name } = parsedPath;
+  if (!name) {
+    name = parsedPath.name;
+  }
 
   console.log(
     `${preTitle ? `${preTitle} ` : ""}${bold(`======= ${name} =======`)}`,
@@ -207,20 +220,89 @@ for (const filePath of paths) {
       books: [],
     };
 
-    const entries = [...Deno.readDirSync(filePath)]
-      .filter((x) => x.isFile && x.name.endsWith(".epub"))
-      .sort((a, b) => a.name.localeCompare(b.name));
-    const lenStr = entries.length.toString();
-    for (const [i, { name }] of entries.entries()) {
-      const innerFilePath = path.join(filePath, name);
-      const parsedPath = path.parse(innerFilePath);
-      data.books.push(
-        await processFile(
-          innerFilePath,
-          savedData?.books.find((x) => x.name === parsedPath.name),
-          `${(i + 1).toString().padStart(lenStr.length, " ")} / ${lenStr}`,
-        ),
-      );
+    interface Book {
+      type: "book";
+      name: string;
+      path: string;
+    }
+    interface Series {
+      type: "series";
+      name: string;
+      books: Book[];
+    }
+    const books: Array<Book | Series> = [];
+    let total = 0;
+    const entries = [...Deno.readDirSync(filePath)];
+    for (const bookEntry of entries) {
+      if (bookEntry.isFile && bookEntry.name.endsWith(".epub")) {
+        const name = path.parse(bookEntry.name).name;
+        books.push({
+          type: "book",
+          name,
+          path: path.join(filePath, bookEntry.name),
+        });
+        total++;
+      }
+    }
+    for (const seriesEntry of entries) {
+      if (
+        seriesEntry.isDirectory &&
+        (!args.ignore || !args.ignore.includes(seriesEntry.name))
+      ) {
+        const series: Series = {
+          type: "series",
+          name: seriesEntry.name,
+          books: [],
+        };
+        const seriesPath = path.join(filePath, series.name);
+        for (const bookEntry of Deno.readDirSync(seriesPath)) {
+          if (bookEntry.isFile && bookEntry.name.endsWith(".epub")) {
+            const name = path.parse(bookEntry.name).name;
+            series.books.push({
+              type: "book",
+              name,
+              path: path.join(seriesPath, bookEntry.name),
+            });
+            total++;
+          }
+        }
+        series.books.sort((a, b) => a.name.localeCompare(b.name));
+        books.push(series);
+      }
+    }
+    books.sort((a, b) => a.name.localeCompare(b.name));
+
+    const totalStr = total.toString();
+    let i = 0;
+    for (const entry of books) {
+      if (entry.type === "book") {
+        const name = entry.name;
+        data.books.push(
+          await processFile({
+            filePath: entry.path,
+            name,
+            savedData: savedData?.books.find((x) => x.name === name),
+            preTitle: `${(i + 1).toString().padStart(totalStr.length, " ")} / ${totalStr}`,
+          }),
+        );
+        i++;
+      }
+    }
+    for (const entry of books) {
+      if (entry.type === "series") {
+        for (const book of entry.books) {
+          const name = `${entry.name} ${book.name}`;
+          data.books.push(
+            await processFile({
+              filePath: book.path,
+              name,
+              savedData: savedData?.books.find((x) => x.name === name),
+              preTitle: `${(i + 1).toString().padStart(totalStr.length, " ")} / ${totalStr}`,
+            }),
+          );
+          i++;
+        }
+      }
     }
 
     if (args.save) {
