@@ -8,7 +8,11 @@ const japaneseRegex =
 const specialRegex =
   /[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF\uFF21-\uFF3A\uFF41-\uFF5A\uFF10-\uFF19\u3005]/g;
 
-export function Process(text: string, output: string) {
+export function Process(
+  text: string,
+  output: string,
+  series?: { uniqueWords: Map<string, number> },
+) {
   let wordInfos = Parse(output);
 
   // Only keep kanjis, kanas, digits,full width digits, latin characters, full width latin characters
@@ -23,6 +27,10 @@ export function Process(text: string, output: string) {
   for (const word of wordInfos) {
     const count = uniqueWords.get(word.DictionaryForm) || 0;
     uniqueWords.set(word.DictionaryForm, count + 1);
+    if (series) {
+      const count = series.uniqueWords.get(word.DictionaryForm) || 0;
+      series.uniqueWords.set(word.DictionaryForm, count + 1);
+    }
   }
 
   let wordsUsedOnce = 0;

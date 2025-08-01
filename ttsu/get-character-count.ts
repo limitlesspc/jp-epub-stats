@@ -8,7 +8,7 @@
 import { isNodeGaiji } from "./is-node-gaiji.ts";
 
 export function getCharacterCount(node: Node) {
-  return isNodeGaiji(node) ? 1 : getRawCharacterCount(node);
+  return isNodeGaiji(node) ? 0 : getRawCharacterCount(node);
 }
 
 const isNotJapaneseRegex =

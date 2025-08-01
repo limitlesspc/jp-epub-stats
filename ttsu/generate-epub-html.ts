@@ -22,6 +22,7 @@ export const prependValue = "ttu-";
 export default function generateEpubHtml(
   data: Record<string, string | Blob>,
   contents: EpubContent | EpubOPFContent,
+  series?: { uniqueKanji: Map<string, number> },
 ) {
   const fallbackData = new Map<string, string>();
 
@@ -225,6 +226,10 @@ export default function generateEpubHtml(
       if (isKanji(char)) {
         const count = uniqueKanji.get(char) || 0;
         uniqueKanji.set(char, count + 1);
+        if (series) {
+          const count = series.uniqueKanji.get(char) || 0;
+          series.uniqueKanji.set(char, count + 1);
+        }
       }
     }
   }

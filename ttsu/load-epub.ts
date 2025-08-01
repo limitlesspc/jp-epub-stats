@@ -10,11 +10,14 @@ import generateEpubHtml from "./generate-epub-html.ts";
 import { isOPFType } from "./types.ts";
 import * as path from "@std/path";
 
-export default async function loadEpub(filePath: string) {
+export default async function loadEpub(
+  filePath: string,
+  series?: { uniqueKanji: Map<string, number> },
+) {
   const stream = await Deno.readFile(filePath);
   const blob = new Blob([stream]);
   const { contents, result: data } = await extractEpub(blob);
-  const result = generateEpubHtml(data, contents);
+  const result = generateEpubHtml(data, contents, series);
 
   const fileName = path.parse(filePath).name;
   let title = fileName;

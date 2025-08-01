@@ -2,7 +2,7 @@ import { parseArgs } from "@std/cli/parse-args";
 import * as path from "@std/path";
 import { bold } from "@std/fmt/colors";
 import { z } from "zod";
-import loadEpub from "./load-epub.ts";
+import loadEpub from "./ttsu/load-epub.ts";
 import { Process } from "./sudachi/mod.ts";
 
 const args = parseArgs(Deno.args, {
@@ -26,7 +26,7 @@ Usage: deno run -A main.ts [FILES] [OPTIONS]
 Arguments:
   [FILES]
         Input epub files or directories to calculate stats
-        Sub-directories will be considered a series
+        EPUB files in a sub-directory will be considered part of the same series
 
 Options:
   --csv <STATS_FILE>
@@ -70,21 +70,36 @@ const savedBookDataSchema = z.object({
   kanjiUsedOnce: z.number(),
 });
 type SavedBookData = z.infer<typeof savedBookDataSchema>;
-const VERSION = "2025-07-02";
+const savedSeriesDataSchema = z.object({
+  name: z.string(),
+  uniqueWords: z.number().optional(),
+  wordsUsedOnce: z.number().optional(),
+  uniqueKanji: z.number(),
+  kanjiUsedOnce: z.number(),
+  books: z.array(savedBookDataSchema),
+});
+const VERSION = "2025-08-01";
 const savedDataSchema = z.object({
   version: z.literal(VERSION),
   books: z.array(savedBookDataSchema),
+  series: z.array(savedSeriesDataSchema),
 });
 type SavedData = z.infer<typeof savedDataSchema>;
 
 async function processFile({
-  filePath,
   name,
+  series,
+  filePath,
   savedData,
   preTitle,
 }: {
-  filePath: string;
   name?: string;
+  series?: {
+    name: string;
+    uniqueWords: Map<string, number>;
+    uniqueKanji: Map<string, number>;
+  };
+  filePath: string;
   savedData?: SavedBookData;
   preTitle?: string;
 }): Promise<SavedBookData> {
@@ -98,7 +113,7 @@ async function processFile({
   }
 
   console.log(
-    `${preTitle ? `${preTitle} ` : ""}${bold(`======= ${name} =======`)}`,
+    `${preTitle ? `${preTitle} ` : ""}${bold(`======= ${series ? `${series.name} ` : ""}${name} =======`)}`,
   );
   let header = "";
   for (const [i, label] of headers.entries()) {
@@ -122,7 +137,7 @@ async function processFile({
     );
   } else {
     const { characters, uniqueKanji, uniqueKanjiUsedOnce, sections } =
-      await loadEpub(filePath);
+      await loadEpub(filePath, series);
     savedData = {
       name,
       characters,
@@ -158,6 +173,7 @@ async function processFile({
       const { wordCount, uniqueWordCount, uniqueWordUsedOnceCount } = Process(
         content,
         output,
+        series,
       );
 
       rowData.push(wordCount, uniqueWordCount, uniqueWordUsedOnceCount);
@@ -210,14 +226,16 @@ for (const filePath of paths) {
     const statsPath = path.join(filePath, "stats.json");
     if (args.save) {
       try {
-        const json = await Deno.readTextFile(statsPath);
+        const json = await Deno.readTextFile(statsPath).catch(() => "");
         savedData = savedDataSchema.parse(JSON.parse(json));
+        // deno-lint-ignore no-empty
       } catch {}
     }
 
     const data: SavedData = {
       version: VERSION,
       books: [],
+      series: [],
     };
 
     interface Book {
@@ -279,8 +297,8 @@ for (const filePath of paths) {
         const name = entry.name;
         data.books.push(
           await processFile({
-            filePath: entry.path,
             name,
+            filePath: entry.path,
             savedData: savedData?.books.find((x) => x.name === name),
             preTitle: `${(i + 1).toString().padStart(totalStr.length, " ")} / ${totalStr}`,
           }),
@@ -290,18 +308,63 @@ for (const filePath of paths) {
     }
     for (const entry of books) {
       if (entry.type === "series") {
+        let seriesSavedData = savedData?.series.find(
+          (x) => x.name === entry.name,
+        );
+
+        if (seriesSavedData) {
+          const savedBookNames = seriesSavedData.books.map((x) => x.name);
+          const foundBookNames = entry.books.map((x) => x.name);
+          if (
+            savedBookNames.some((x) => !foundBookNames.includes(x)) ||
+            foundBookNames.some((x) => !savedBookNames.includes(x))
+          ) {
+            seriesSavedData = undefined;
+          }
+        }
+
+        const books: SavedBookData[] = [];
+        const uniqueWords = new Map<string, number>();
+        const uniqueKanji = new Map<string, number>();
+
         for (const book of entry.books) {
-          const name = `${entry.name} ${book.name}`;
-          data.books.push(
+          const bookSavedData = seriesSavedData?.books.find(
+            (x) => x.name === book.name,
+          );
+          books.push(
             await processFile({
+              name: book.name,
+              series: {
+                name: entry.name,
+                uniqueWords,
+                uniqueKanji,
+              },
               filePath: book.path,
-              name,
-              savedData: savedData?.books.find((x) => x.name === name),
+              savedData: bookSavedData,
               preTitle: `${(i + 1).toString().padStart(totalStr.length, " ")} / ${totalStr}`,
             }),
           );
           i++;
         }
+
+        let wordsUsedOnce = 0;
+        for (const count of uniqueWords.values()) {
+          if (count === 1) wordsUsedOnce++;
+        }
+
+        let kanjiUsedOnce = 0;
+        for (const count of uniqueKanji.values()) {
+          if (count === 1) kanjiUsedOnce++;
+        }
+
+        data.series.push({
+          name: entry.name,
+          uniqueWords: uniqueWords.size,
+          wordsUsedOnce,
+          uniqueKanji: uniqueKanji.size,
+          kanjiUsedOnce,
+          books,
+        });
       }
     }
 
@@ -312,25 +375,49 @@ for (const filePath of paths) {
       const csvPath = path.join(filePath, args.csv);
 
       const rows = [`name,${headers.join(",")}`];
-      rows.push(
-        ...data.books.map((x) =>
+
+      rows.push(...books2Csv(data.books));
+      for (const {
+        name,
+        uniqueWords,
+        wordsUsedOnce,
+        uniqueKanji,
+        kanjiUsedOnce,
+        books,
+      } of data.series) {
+        rows.push(
           [
-            x.name,
-            x.characters,
-            x.words || "",
-            x.uniqueWords || "",
-            x.wordsUsedOnce || "",
-            x.uniqueKanji,
-            x.kanjiUsedOnce,
+            name,
+            "",
+            "",
+            uniqueWords || "",
+            wordsUsedOnce || "",
+            uniqueKanji,
+            kanjiUsedOnce,
           ].join(","),
-        ),
-      );
+          ...books2Csv(books),
+        );
+      }
 
       await Deno.writeTextFile(csvPath, rows.join("\n"));
     }
   } else {
-    await processFile(filePath);
+    await processFile({ filePath });
   }
+}
+
+function books2Csv(books: SavedBookData[]) {
+  return books.map((x) =>
+    [
+      x.name,
+      x.characters,
+      x.words || "",
+      x.uniqueWords || "",
+      x.wordsUsedOnce || "",
+      x.uniqueKanji,
+      x.kanjiUsedOnce,
+    ].join(","),
+  );
 }
 
 Deno.exit();
