@@ -80,7 +80,7 @@ const savedSeriesDataSchema = z.object({
   kanjiUsedOnce: z.number(),
   books: z.array(savedBookDataSchema),
 });
-const VERSION = "2025-08-02-1";
+const VERSION = "2025-08-02-2";
 const savedDataSchema = z.object({
   version: z.literal(VERSION),
   books: z.array(savedBookDataSchema),
@@ -138,13 +138,15 @@ async function processFile({
       savedData.kanjiUsedOnce,
     );
   } else {
-    const { characters, uniqueKanji, uniqueKanjiUsedOnce, sections } =
-      await loadEpub(filePath, series);
+    const { characters, uniqueKanji, kanjiUsedOnce, sections } = await loadEpub(
+      filePath,
+      series,
+    );
     savedData = {
       name,
       characters,
       uniqueKanji,
-      kanjiUsedOnce: uniqueKanjiUsedOnce,
+      kanjiUsedOnce,
     };
 
     rowData.push(characters);
@@ -172,19 +174,19 @@ async function processFile({
 
       const output = new TextDecoder().decode(stdout);
 
-      const { wordCount, uniqueWordCount, uniqueWordUsedOnceCount } = Process(
+      const { wordCount, uniqueWords, wordsUsedOnce } = Process(
         content,
         output,
         series,
       );
 
-      rowData.push(wordCount, uniqueWordCount, uniqueWordUsedOnceCount);
+      rowData.push(wordCount, uniqueWords, wordsUsedOnce);
       savedData.words = wordCount;
-      savedData.uniqueWords = uniqueWordCount;
-      savedData.wordsUsedOnce = uniqueWordUsedOnceCount;
+      savedData.uniqueWords = uniqueWords;
+      savedData.wordsUsedOnce = wordsUsedOnce;
     }
 
-    rowData.push(uniqueKanji, uniqueKanjiUsedOnce);
+    rowData.push(uniqueKanji, kanjiUsedOnce);
 
     if (args.extract) {
       const textPath = path.format({
@@ -369,7 +371,7 @@ for (const filePath of paths) {
           for (const count of uniqueKanji.values()) {
             if (count === 1) kanjiUsedOnce++;
           }
-          uniqueKanjiCount = uniqueWords.size;
+          uniqueKanjiCount = uniqueKanji.size;
         }
 
         data.series.push({

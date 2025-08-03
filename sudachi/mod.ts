@@ -1,5 +1,4 @@
 import { Parse } from "./parser.ts";
-import { isKanji } from "wanakana";
 
 const unrelatedRegex =
   /[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF\uFF21-\uFF3A\uFF41-\uFF5A\uFF10-\uFF19\u3005．]/g;
@@ -38,15 +37,6 @@ export function Process(
     if (count === 1) wordsUsedOnce++;
   }
 
-  const uniqueKanji = new Map<string, number>();
-  const chars = Array.from(text);
-  for (const char of chars) {
-    if (isKanji(char)) {
-      const count = uniqueKanji.get(char) || 0;
-      uniqueKanji.set(char, count + 1);
-    }
-  }
-
   // Split into sentences
   let sentences = text.split(/(?<=[。！？」）])|(?<=[…—])\r\n/);
   sentences = sentences
@@ -64,15 +54,9 @@ export function Process(
     .filter((s) => !s);
 
   return {
-    characterCount: wordInfos.reduce((sum, x) => sum + x.Text.length, 0),
     wordCount: wordInfos.length,
-    uniqueWordCount: uniqueWords.size,
-    uniqueWordUsedOnceCount: [...uniqueWords.values()].reduce(
-      (sum, count) => (count === 1 ? sum + 1 : sum),
-      0,
-    ),
-    uniqueKanjiCount: uniqueKanji.size,
-    uniqueKanjiUsedOnceCount: [...uniqueKanji.values()].reduce(
+    uniqueWords: uniqueWords.size,
+    wordsUsedOnce: [...uniqueWords.values()].reduce(
       (sum, count) => (count === 1 ? sum + 1 : sum),
       0,
     ),

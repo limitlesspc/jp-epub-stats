@@ -242,7 +242,7 @@ export default function generateEpubHtml(
   return {
     characters: currentCharCount,
     uniqueKanji: uniqueKanji.size,
-    uniqueKanjiUsedOnce: kanjiUsedOnce,
+    kanjiUsedOnce,
     sections,
   };
 }
