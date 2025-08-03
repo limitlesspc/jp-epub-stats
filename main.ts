@@ -72,13 +72,15 @@ const savedBookDataSchema = z.object({
 type SavedBookData = z.infer<typeof savedBookDataSchema>;
 const savedSeriesDataSchema = z.object({
   name: z.string(),
+  characters: z.number(),
+  words: z.number().optional(),
   uniqueWords: z.number().optional(),
   wordsUsedOnce: z.number().optional(),
   uniqueKanji: z.number(),
   kanjiUsedOnce: z.number(),
   books: z.array(savedBookDataSchema),
 });
-const VERSION = "2025-08-01";
+const VERSION = "2025-08-02";
 const savedDataSchema = z.object({
   version: z.literal(VERSION),
   books: z.array(savedBookDataSchema),
@@ -359,6 +361,14 @@ for (const filePath of paths) {
 
         data.series.push({
           name: entry.name,
+          characters: books.reduce((sum, book) => sum + book.characters, 0),
+          words: books.reduce(
+            (sum, book) =>
+              typeof sum === "number" && typeof book.words === "number"
+                ? sum + book.words
+                : undefined,
+            0 as number | undefined,
+          ),
           uniqueWords: uniqueWords.size,
           wordsUsedOnce,
           uniqueKanji: uniqueKanji.size,
@@ -379,6 +389,8 @@ for (const filePath of paths) {
       rows.push(...books2Csv(data.books));
       for (const {
         name,
+        characters,
+        words,
         uniqueWords,
         wordsUsedOnce,
         uniqueKanji,
@@ -388,8 +400,8 @@ for (const filePath of paths) {
         rows.push(
           [
             name,
-            "",
-            "",
+            characters,
+            words || "",
             uniqueWords || "",
             wordsUsedOnce || "",
             uniqueKanji,
