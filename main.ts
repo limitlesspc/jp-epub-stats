@@ -80,7 +80,7 @@ const savedSeriesDataSchema = z.object({
   kanjiUsedOnce: z.number(),
   books: z.array(savedBookDataSchema),
 });
-const VERSION = "2025-08-02";
+const VERSION = "2025-08-02-1";
 const savedDataSchema = z.object({
   version: z.literal(VERSION),
   books: z.array(savedBookDataSchema),
@@ -314,6 +314,10 @@ for (const filePath of paths) {
           (x) => x.name === entry.name,
         );
 
+        let wordsUsedOnce = 0;
+        let uniqueWordsCount = 0;
+        let kanjiUsedOnce = 0;
+        let uniqueKanjiCount = 0;
         if (seriesSavedData) {
           const savedBookNames = seriesSavedData.books.map((x) => x.name);
           const foundBookNames = entry.books.map((x) => x.name);
@@ -322,6 +326,11 @@ for (const filePath of paths) {
             foundBookNames.some((x) => !savedBookNames.includes(x))
           ) {
             seriesSavedData = undefined;
+          } else {
+            wordsUsedOnce = seriesSavedData.wordsUsedOnce || 0;
+            uniqueWordsCount = seriesSavedData.uniqueWords || 0;
+            kanjiUsedOnce = seriesSavedData.kanjiUsedOnce;
+            uniqueKanjiCount = seriesSavedData.uniqueKanji;
           }
         }
 
@@ -349,14 +358,18 @@ for (const filePath of paths) {
           i++;
         }
 
-        let wordsUsedOnce = 0;
-        for (const count of uniqueWords.values()) {
-          if (count === 1) wordsUsedOnce++;
+        if (!uniqueWordsCount) {
+          for (const count of uniqueWords.values()) {
+            if (count === 1) wordsUsedOnce++;
+          }
+          uniqueWordsCount = uniqueWords.size;
         }
 
-        let kanjiUsedOnce = 0;
-        for (const count of uniqueKanji.values()) {
-          if (count === 1) kanjiUsedOnce++;
+        if (!uniqueKanjiCount) {
+          for (const count of uniqueKanji.values()) {
+            if (count === 1) kanjiUsedOnce++;
+          }
+          uniqueKanjiCount = uniqueWords.size;
         }
 
         data.series.push({
@@ -369,9 +382,9 @@ for (const filePath of paths) {
                 : undefined,
             0 as number | undefined,
           ),
-          uniqueWords: uniqueWords.size,
+          uniqueWords: uniqueWordsCount,
           wordsUsedOnce,
-          uniqueKanji: uniqueKanji.size,
+          uniqueKanji: uniqueKanjiCount,
           kanjiUsedOnce,
           books,
         });
