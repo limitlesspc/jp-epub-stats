@@ -31,7 +31,7 @@ Arguments:
 Options:
   --csv <STATS_FILE>
         Output stats table to a file
-  --extract
+  -e, --extract
         Outputs the text extracted from each epub
         If an epub's file name is title.epub, it will output title.txt
   -s, --save
@@ -127,8 +127,22 @@ async function processFile({
   console.log(header);
   console.log("-".repeat(header.length));
 
+  const textPath = path.format({
+    dir: parsedPath.dir,
+    name: parsedPath.name,
+    ext: ".txt",
+  });
+  let textFileExists = false;
+  try {
+    await Deno.stat(textPath);
+    textFileExists = true;
+    // deno-lint-ignore no-empty
+  } catch {}
+
+  const textNeedsExtracting = !textFileExists && args.extract;
+
   const rowData: number[] = [];
-  if (savedData) {
+  if (savedData && !textNeedsExtracting) {
     rowData.push(
       savedData.characters,
       savedData.words || 0,
@@ -142,6 +156,22 @@ async function processFile({
       filePath,
       series,
     );
+
+    if (textNeedsExtracting) {
+      let content = "";
+      for (const { label, text, parentChapter } of sections) {
+        if (label && !text?.trimStart().startsWith(label))
+          content += `\n\n\n\n     ${label}\n`;
+        if (text) {
+          if (!parentChapter) content += "\n\n";
+          content += `\n${text}\n`;
+        }
+      }
+
+      await Deno.writeTextFile(textPath, content);
+      console.log("extracted text");
+    }
+
     savedData = {
       name,
       characters,
@@ -187,26 +217,6 @@ async function processFile({
     }
 
     rowData.push(uniqueKanji, kanjiUsedOnce);
-
-    if (args.extract) {
-      const textPath = path.format({
-        dir: parsedPath.dir,
-        name: parsedPath.name,
-        ext: ".txt",
-      });
-
-      let content = "";
-      for (const { label, text, parentChapter } of sections) {
-        if (label && !text?.trimStart().startsWith(label))
-          content += `\n\n\n\n     ${label}\n`;
-        if (text) {
-          if (!parentChapter) content += "\n\n";
-          content += `\n${text}\n`;
-        }
-      }
-
-      await Deno.writeTextFile(textPath, content);
-    }
   }
 
   let row = "";
